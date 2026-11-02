@@ -1,7 +1,7 @@
 :root{--bg:#f4efe3;--card:#fffdf7;--ink:#2f3a2a;--muted:#5d6655;--accent:#526d45;--line:#d9ccb2}
 @media (prefers-color-scheme:dark){:root{--bg:#1c2620;--card:#243129;--ink:#ece6d6;--muted:#b7b29f;--accent:#9cc28a;--line:#3b4a3f}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.6 Georgia,"Times New Roman",serif}
+body{margin:0;overflow-wrap:anywhere;overflow-x:hidden;background:var(--bg);color:var(--ink);font:17px/1.6 Georgia,"Times New Roman",serif}
 main{max-width:760px;margin:0 auto;padding:48px 20px 64px}
 header{margin-bottom:28px}
 header a.home{color:var(--accent);text-decoration:none;font-weight:bold;letter-spacing:.02em}
