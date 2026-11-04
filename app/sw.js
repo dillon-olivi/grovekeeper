@@ -1,6 +1,6 @@
 // JournalScape phone app: offline shell. App files are served from the cache (refreshed in the background); Google
 // sign-in and Drive requests always go to the network and are never cached. Bump VERSION when files change.
-const VERSION='gk-phone-mw1sa962',SHELL=['./','index.html','style.css','app.mjs','logic.mjs','drive.mjs','sync.mjs','sync-stamps.mjs','groceries.mjs','journal.mjs','config.mjs','manifest.webmanifest','icon-192.png','icon-512.png'];
+const VERSION='gk-phone-mw208hj0',SHELL=['./','index.html','style.css','app.mjs','logic.mjs','drive.mjs','sync.mjs','sync-stamps.mjs','groceries.mjs','journal.mjs','journal-export.mjs','config.mjs','manifest.webmanifest','icon-192.png','icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(VERSION).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==VERSION).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
 self.addEventListener('fetch',e=>{

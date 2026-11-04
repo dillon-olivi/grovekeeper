@@ -38,3 +38,8 @@ h3.aisle{font:600 11.5px/1 'Segoe UI',system-ui,sans-serif;letter-spacing:.08em;
 #jtext{display:block;width:100%;min-height:46vh;resize:vertical;padding:14px;border-radius:10px;border:1px solid #c9b996;background:#fffdf6;color:var(--ink);font:16px/1.65 Georgia,serif}
 button.jitem{display:grid;gap:2px;width:100%;text-align:left;border:0;background:transparent;padding:4px 0;min-height:0;color:var(--ink)}
 button.jitem .when{font-size:12.5px}button.jitem strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}button.jitem strong.untitled{font-style:italic;font-weight:600}
+
+/* Journal download (4 November 2026). */
+.jexport{display:flex;gap:8px;flex-wrap:wrap}.jexport select{flex:1;min-width:180px;min-height:40px;border-radius:10px;border:1px solid #c9b996;background:#fffdf6;color:var(--ink);padding:0 10px}
+
+.jfoot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px}.jfinish{min-height:40px;padding:0 16px;border-radius:10px;border:0;background:#5f8148;color:#fff;font-weight:600}.jfinish.done{background:#e7efdc;color:#3e5a2c}

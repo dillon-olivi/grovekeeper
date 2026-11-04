@@ -22,8 +22,9 @@ export function validateJournal(s){
   if(typeof r.text!=='string'||r.text.length>JOURNAL_LIMITS.text)throw Error('Journal entries must be text.');
   if(r.title!==undefined&&(typeof r.title!=='string'||!r.title.trim()||r.title.length>JOURNAL_LIMITS.title||/[\r\n]/.test(r.title)))throw Error('Journal titles are one line of up to '+JOURNAL_LIMITS.title+' characters.');
   if(!r.text.trim()&&!r.title)throw Error('Empty journal entry.');
+  if(r.finishedAt!==undefined&&(typeof r.finishedAt!=='string'||!ISO.test(r.finishedAt)))throw Error('Invalid finish time on a journal entry.');
   if(!stampOk(r))throw Error('Invalid change stamp on a journal entry.');
-  days.add(r.id);return {id:r.id,date:r.date,...(r.title!==undefined?{title:r.title}:{}),text:r.text,...(r.updatedAt?{updatedAt:r.updatedAt,updatedBy:r.updatedBy}:{})};
+  days.add(r.id);return {id:r.id,date:r.date,...(r.title!==undefined?{title:r.title}:{}),text:r.text,...(r.finishedAt?{finishedAt:r.finishedAt}:{}),...(r.updatedAt?{updatedAt:r.updatedAt,updatedBy:r.updatedBy}:{})};
  }).sort((a,b)=>a.id.localeCompare(b.id));
 }
 
@@ -39,6 +40,13 @@ export function writeEntry(s,day,text,title){
  const next=old?list(s).map(r=>r.id===day?make(r):r):[...list(s),make({id:day,date:day})];
  return {...s,journal:next.sort((a,b)=>a.id.localeCompare(b.id))};
 }
+// Finish the day's entry (owner, 4 November 2026): the "I journaled today" confirmation. It stays finished if you
+// come back and add more; finishing again only refreshes the time. Never XP.
+export function finishEntry(s,day,at=new Date().toISOString()){
+ const old=entryFor(s,day);if(!old||!ISO.test(at))return s;
+ return {...s,journal:list(s).map(r=>r.id===day?{...r,finishedAt:at}:r)};
+}
+export const isFinished=r=>!!r?.finishedAt;
 export const wordCount=text=>String(text||'').trim().split(/\s+/).filter(Boolean).length;
 // The name shown in lists: the title, or the first three words when there is no title.
 export function entryName(r){
@@ -50,7 +58,7 @@ export function entryName(r){
 export function journalList(s,query=''){
  const q=String(query).trim().toLocaleLowerCase();
  return list(s).filter(r=>!q||r.text.toLocaleLowerCase().includes(q)||(r.title||'').toLocaleLowerCase().includes(q)).sort((a,b)=>b.id.localeCompare(a.id))
-  .map(r=>({id:r.id,date:r.date,title:r.title||'',name:entryName(r),preview:r.text.replace(/\s+/g,' ').trim().slice(0,140),words:wordCount(r.text)}));
+  .map(r=>({id:r.id,date:r.date,finished:!!r.finishedAt,title:r.title||'',name:entryName(r),preview:r.text.replace(/\s+/g,' ').trim().slice(0,140),words:wordCount(r.text)}));
 }
 
 // A gentle, encouraging line for an empty page, picked at random each time a day is opened.
@@ -87,3 +95,18 @@ export const JOURNAL_PROMPTS=[
  'Every page is a fresh start.'
 ];
 export const randomPrompt=(rand=Math.random)=>JOURNAL_PROMPTS[Math.floor(rand()*JOURNAL_PROMPTS.length)%JOURNAL_PROMPTS.length];
+
+// Journal analytics (owner, 4 November 2026): how often and how much you write. Days are local planner days (ISO).
+// Optional from/to limit the period; streaks always look at the whole journal and end today (or yesterday, so an
+// unwritten today does not break a streak before the day is over).
+const nextDay=d=>{const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+1);return x.toISOString().slice(0,10);};
+export function journalStats(s,{from='',to='',today=''}={}){
+ const all=list(s).filter(r=>r.text.trim()||r.title).sort((a,b)=>a.id.localeCompare(b.id));
+ const rows=all.filter(r=>(!from||r.id>=from)&&(!to||r.id<=to)),byDay={};
+ for(const r of rows)byDay[r.id]=wordCount(r.text);
+ const words=rows.reduce((n,r)=>n+byDay[r.id],0),longest=rows.reduce((b,r)=>byDay[r.id]>(b?.words||0)?{id:r.id,words:byDay[r.id]}:b,null);
+ let best=0,run=0,prev='';for(const r of all){run=prev&&nextDay(prev)===r.id?run+1:1;best=Math.max(best,run);prev=r.id;}
+ let current=0;if(today&&all.length){const days=new Set(all.map(r=>r.id));let d=days.has(today)?today:(()=>{const y=new Date(today+'T12:00:00Z');y.setUTCDate(y.getUTCDate()-1);return y.toISOString().slice(0,10);})();
+  while(days.has(d)){current++;const y=new Date(d+'T12:00:00Z');y.setUTCDate(y.getUTCDate()-1);d=y.toISOString().slice(0,10);}}
+ return {entries:rows.length,words,average:rows.length?Math.round(words/rows.length):0,finished:rows.filter(r=>r.finishedAt).length,longest,byDay,streak:current,bestStreak:best,total:all.length};
+}

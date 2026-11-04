@@ -5,7 +5,8 @@ import {todayView,addTask,toggleTask,deleteTask,toggleRoutine,moveTask,commit,sy
 import {createPhoneDrive,DRIVE_SCOPE} from './drive.mjs';
 import {WEB_CLIENT_ID} from './config.mjs';
 import {addItem,setInTrip,toggleGot,loadTrip,finishTrip,tripView,masterView,guessSection} from './groceries.mjs';
-import {entryFor,writeEntry,journalList,wordCount,randomPrompt,JOURNAL_LIMITS} from './journal.mjs';
+import {entryFor,writeEntry,finishEntry,journalList,wordCount,randomPrompt,JOURNAL_LIMITS} from './journal.mjs';
+import {exportJournal,journalSummary,JOURNAL_EXPORT_FORMATS} from './journal-export.mjs';
 
 const KEY='grovekeeper.phone.v1',$=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -87,10 +88,20 @@ const shiftDay=(day,n)=>{const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUT
 function journalView(){
  const d=journalDay||today(),e=entryFor(store.state,d),list=journalList(store.state).slice(0,30);
  return `<section class="card journal"><div class="jhead"><button type="button" data-act="jprev" aria-label="Previous day">‹</button><h2>${esc(label(d))}</h2><button type="button" data-act="jnext" aria-label="Next day">›</button></div>
-  <input type="text" id="jtitle" maxlength="${JOURNAL_LIMITS.title}" placeholder="Title (optional)" aria-label="Title for ${esc(label(d))}" value="${esc(e?.title||'')}" autocomplete="off" enterkeyhint="next">
-  <textarea id="jtext" placeholder="${esc(journalPrompt)}" aria-label="Journal entry for ${esc(label(d))}">${esc(e?e.text:'')}</textarea>
-  <div class="small muted" id="jcount">${e?wordCount(e.text)+' words':''}</div></section>
- ${list.length?`<section class="card"><h2>Past entries</h2><ul class="list">${list.map(r=>`<li><button type="button" class="jitem" data-act="jopen" data-id="${esc(r.id)}"><span class="when">${esc(longDay(r.id))}</span><strong class="${r.title?'':'untitled'}">${esc(r.name||'Untitled')}</strong></button></li>`).join('')}</ul></section>`:''}`;
+  <input type="text" id="jtitle" spellcheck="true" autocorrect="on" autocapitalize="sentences" maxlength="${JOURNAL_LIMITS.title}" placeholder="Title (optional)" aria-label="Title for ${esc(label(d))}" value="${esc(e?.title||'')}" autocomplete="off" enterkeyhint="next">
+  <textarea id="jtext" spellcheck="true" autocorrect="on" autocapitalize="sentences" placeholder="${esc(journalPrompt)}" aria-label="Journal entry for ${esc(label(d))}">${esc(e?e.text:'')}</textarea>
+  <div class="jfoot"><span class="small muted" id="jcount">${e?wordCount(e.text)+' words':''}</span><button type="button" class="jfinish${e?.finishedAt?' done':''}" data-act="jfinish">${e?.finishedAt?'✓ Entry kept':'Finish entry'}</button></div></section>
+ ${list.length?`<section class="card"><h2>Past entries</h2><ul class="list">${list.map(r=>`<li><button type="button" class="jitem" data-act="jopen" data-id="${esc(r.id)}"><span class="when">${esc(longDay(r.id))}</span><strong class="${r.title?'':'untitled'}">${esc(r.name||'Untitled')}</strong></button></li>`).join('')}</ul></section>
+ <section class="card"><h2>Keep a copy</h2><p class="small muted">Download your whole journal (${journalSummary(store.state).entries} entries). Save it to Files or Google Drive, email it to yourself, or keep it anywhere.</p>
+  <div class="jexport"><select id="jfmt" aria-label="File type">${JOURNAL_EXPORT_FORMATS.map(f=>`<option value="${f.id}">${esc(f.label)}</option>`).join('')}</select>
+  <button type="button" data-act="jexport">Download journal</button></div></section>`:''}`;
+}
+// Download the journal (owner, 4 November 2026): the share sheet where the phone has one (Files, Google Drive, email…),
+// otherwise a normal download. Nothing is uploaded by the app.
+async function shareJournal(fmt){
+ const f=exportJournal(store.state,fmt,today()),file=new File([f.data],f.name,{type:f.type.split(';')[0]});
+ try{if(navigator.canShare?.({files:[file]})){await navigator.share({files:[file],title:'My journal'});return;}}catch(e){if(e?.name==='AbortError')return;}
+ const url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download=f.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);toast('Journal downloaded');
 }
 // Saving a journal entry never redraws the page (so the keyboard and cursor stay put while writing).
 function saveJournal(){clearTimeout(journalTimer);journalTimer=null;const t=$('#jtext');if(!t)return;const d=journalDay||today(),prev=store.state,next=writeEntry(prev,d,t.value,$('#jtitle')?.value??'');if(next===prev)return;store.state=commit(prev,next,store.device);dirty=true;persist();renderSync();syncSoon();}
@@ -121,6 +132,8 @@ document.addEventListener('click',e=>{
   case 'jprev':saveJournal();journalDay=shiftDay(journalDay||today(),-1);journalPrompt=randomPrompt();render();break;
   case 'jnext':saveJournal();journalDay=shiftDay(journalDay||today(),1);journalPrompt=randomPrompt();render();break;
   case 'jopen':saveJournal();journalDay=id;journalPrompt=randomPrompt();render();scrollTo(0,0);break;
+  case 'jfinish':{saveJournal();const d=journalDay||today();if(!entryFor(store.state,d)){toast('Write something first');break;}edit(s=>finishEntry(s,d));toast('Entry kept ✓');break;}
+  case 'jexport':saveJournal();shareJournal($('#jfmt')?.value||'txt');break;
   case 'got':edit(s=>toggleGot(s,id));break;
   case 'pull':edit(s=>setInTrip(s,id,true));break;
   case 'unpull':edit(s=>setInTrip(s,id,false));break;
