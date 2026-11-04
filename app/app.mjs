@@ -5,7 +5,7 @@ import {todayView,addTask,toggleTask,deleteTask,toggleRoutine,moveTask,commit,sy
 import {createPhoneDrive,DRIVE_SCOPE} from './drive.mjs';
 import {WEB_CLIENT_ID} from './config.mjs';
 import {addItem,setInTrip,toggleGot,loadTrip,finishTrip,tripView,masterView,guessSection} from './groceries.mjs';
-import {entryFor,writeEntry,journalList,wordCount} from './journal.mjs';
+import {entryFor,writeEntry,journalList,wordCount,randomPrompt,JOURNAL_LIMITS} from './journal.mjs';
 
 const KEY='grovekeeper.phone.v1',$=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -44,7 +44,7 @@ async function sync(file){
 async function check(){
  if(syncing||!store.state||document.hidden||(!navigator.onLine&&!test))return;
  if(document.activeElement?.matches?.('#add input,#gadd input')&&document.activeElement.value)return;
- if(document.activeElement?.id==='jtext'||journalTimer)return;   // never reload the journal under someone writing   // never redraw under someone typing
+ if(['jtext','jtitle'].includes(document.activeElement?.id)||journalTimer)return;   // never reload the journal under someone writing   // never redraw under someone typing
  if(dirty)return sync();
  try{const file=await driveChanged(drive,store.seen);if(file)await sync(file);else{store.lastSync=new Date().toISOString();syncError='';persist();renderSync();}}catch(e){syncError=e.message;renderSync();}
 }
@@ -82,19 +82,23 @@ function render(){
 }
 // Groceries (3 November 2026; docs/GROCERIES.md): the trip by aisle, tap to check off; usual items and saved trips below.
 // Journal (3 November 2026; docs/JOURNAL.md): today's entry (or any earlier day), saved as you write; earlier entries below.
-let journalDay=null,journalTimer=null;
+let journalDay=null,journalTimer=null,journalPrompt=randomPrompt();
 const shiftDay=(day,n)=>{const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
 function journalView(){
  const d=journalDay||today(),e=entryFor(store.state,d),list=journalList(store.state).slice(0,30);
  return `<section class="card journal"><div class="jhead"><button type="button" data-act="jprev" aria-label="Previous day">‹</button><h2>${esc(label(d))}</h2><button type="button" data-act="jnext" aria-label="Next day">›</button></div>
-  <textarea id="jtext" maxlength="20000" placeholder="How was your day?" aria-label="Journal entry for ${esc(label(d))}">${esc(e?e.text:'')}</textarea>
+  <input type="text" id="jtitle" maxlength="${JOURNAL_LIMITS.title}" placeholder="Title (optional)" aria-label="Title for ${esc(label(d))}" value="${esc(e?.title||'')}" autocomplete="off" enterkeyhint="next">
+  <textarea id="jtext" placeholder="${esc(journalPrompt)}" aria-label="Journal entry for ${esc(label(d))}">${esc(e?e.text:'')}</textarea>
   <div class="small muted" id="jcount">${e?wordCount(e.text)+' words':''}</div></section>
- ${list.length?`<section class="card"><h2>Past entries</h2><ul class="list">${list.map(r=>`<li><button type="button" class="jitem" data-act="jopen" data-id="${esc(r.id)}"><strong>${esc(label(r.id))}</strong><span class="when">${esc(r.preview)}</span></button></li>`).join('')}</ul></section>`:''}`;
+ ${list.length?`<section class="card"><h2>Past entries</h2><ul class="list">${list.map(r=>`<li><button type="button" class="jitem" data-act="jopen" data-id="${esc(r.id)}"><span class="when">${esc(longDay(r.id))}</span><strong class="${r.title?'':'untitled'}">${esc(r.name||'Untitled')}</strong></button></li>`).join('')}</ul></section>`:''}`;
 }
 // Saving a journal entry never redraws the page (so the keyboard and cursor stay put while writing).
-function saveJournal(){clearTimeout(journalTimer);journalTimer=null;const t=$('#jtext');if(!t)return;const d=journalDay||today(),prev=store.state,next=writeEntry(prev,d,t.value);if(next===prev)return;store.state=commit(prev,next,store.device);dirty=true;persist();renderSync();syncSoon();}
-document.addEventListener('input',e=>{if(e.target.id!=='jtext')return;const n=wordCount(e.target.value);$('#jcount').textContent=n?n+' words':'';clearTimeout(journalTimer);journalTimer=setTimeout(saveJournal,800);});
-document.addEventListener('focusout',e=>{if(e.target.id==='jtext')saveJournal();});
+function saveJournal(){clearTimeout(journalTimer);journalTimer=null;const t=$('#jtext');if(!t)return;const d=journalDay||today(),prev=store.state,next=writeEntry(prev,d,t.value,$('#jtitle')?.value??'');if(next===prev)return;store.state=commit(prev,next,store.device);dirty=true;persist();renderSync();syncSoon();}
+document.addEventListener('input',e=>{if(e.target.id!=='jtext'&&e.target.id!=='jtitle')return;const n=wordCount($('#jtext')?.value);$('#jcount').textContent=n?n+' words':'';clearTimeout(journalTimer);journalTimer=setTimeout(saveJournal,800);});
+document.addEventListener('focusout',e=>{if(e.target.id==='jtext'||e.target.id==='jtitle')saveJournal();});
+document.addEventListener('keydown',e=>{if(e.target.id==='jtitle'&&e.key==='Enter'){e.preventDefault();$('#jtext')?.focus();}});
+// "Today · Tuesday, November 3", or the weekday and date (the year only when it is not this year).
+function longDay(d){const t=today(),date=new Date(d+'T12:00:00'),full=date.toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric',...(d.slice(0,4)===t.slice(0,4)?{}:{year:'numeric'})});return d===t?'Today · '+full:d===shiftDay(t,-1)?'Yesterday · '+full:full;}
 function groceriesView(){
  const s=store.state,v=tripView(s),usual=masterView(s),trips=s.groceryTrips||[];
  const row=r=>`<li class="${r.got?'done':''}"><button class="check" data-act="got" data-id="${esc(r.id)}" aria-pressed="${r.got}" aria-label="${r.got?'Put back':'Got'} ${esc(r.name)}">${r.got?'✓':''}</button><span class="text">${esc(r.name)}${r.note?` <span class="tag">${esc(r.note)}</span>`:''}${r.staple?'':'<span class="tag">once</span>'}</span><button class="del" data-act="unpull" data-id="${esc(r.id)}" aria-label="Take ${esc(r.name)} off this trip">×</button></li>`;
@@ -114,9 +118,9 @@ document.addEventListener('click',e=>{
  const day=e.target.closest('[data-day]');if(day){addDay=day.dataset.day;render();$('#add input')?.focus();return;}
  const b=e.target.closest('[data-act]');if(!b)return;const id=b.dataset.id;
  switch(b.dataset.act){
-  case 'jprev':saveJournal();journalDay=shiftDay(journalDay||today(),-1);render();break;
-  case 'jnext':saveJournal();journalDay=shiftDay(journalDay||today(),1);render();break;
-  case 'jopen':saveJournal();journalDay=id;render();scrollTo(0,0);break;
+  case 'jprev':saveJournal();journalDay=shiftDay(journalDay||today(),-1);journalPrompt=randomPrompt();render();break;
+  case 'jnext':saveJournal();journalDay=shiftDay(journalDay||today(),1);journalPrompt=randomPrompt();render();break;
+  case 'jopen':saveJournal();journalDay=id;journalPrompt=randomPrompt();render();scrollTo(0,0);break;
   case 'got':edit(s=>toggleGot(s,id));break;
   case 'pull':edit(s=>setInTrip(s,id,true));break;
   case 'unpull':edit(s=>setInTrip(s,id,false));break;
