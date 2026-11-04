@@ -4,16 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Grovekeeper Privacy</title>
-<meta name="description" content="How the Grovekeeper desktop planner handles your data, including optional read-only Google Calendar access.">
+<meta name="description" content="How Grovekeeper handles your data, including optional Google Calendar, Gmail and Google Drive phone sync.">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <main>
 <header><a class="home" href="./">Grovekeeper</a></header>
 <h1>Privacy policy</h1>
-<p class="lede">Effective 2 November 2026</p>
+<p class="lede">Effective 3 November 2026</p>
 
-<p>Grovekeeper is a desktop planner that runs on your own Windows computer. This policy explains what data it uses and where that data goes. In short: your data stays on your computer, and Grovekeeper does not sell, share or upload it.</p>
+<p>Grovekeeper is a desktop planner that runs on your own Windows computer, with an optional companion web app for your phone. This policy explains what data it uses and where that data goes. In short: your data stays on your own devices and, only if you turn on phone sync, in a private folder of your own Google Drive. Grovekeeper does not sell or share it, and the developer never receives it.</p>
 
 <h2>Data stored on your computer</h2>
 <p>Your tasks, routines, notes, progress, settings and Grove customization are saved in a folder on your own computer. Grovekeeper has no user accounts and no server of its own, so the developer never receives this data. Backups you create are files you save yourself.</p>
@@ -32,10 +32,33 @@
 <li>Your Google data is <strong>not</strong> sent to the developer or to anyone else, is not sold, is not used for advertising, and is not used to train AI or machine-learning models. No person reads it.</li>
 <li>Calendar events never become tasks and never affect your levels or rewards.</li>
 </ul>
+
+<h2>Phone sync through Google Drive (optional)</h2>
+<p>You can choose to sync your planner between your computer and the Grovekeeper phone app through your own Google Drive. When you turn it on, Google asks you to allow one permission:</p>
+<ul>
+<li><strong>See, create and delete its own configuration data in your Google Drive</strong> (<code>drive.appdata</code>). This is a hidden folder that only Grovekeeper can use. Grovekeeper <strong>cannot</strong> see, open or change any of your other Drive files.</li>
+</ul>
+<p>How Grovekeeper uses this permission:</p>
+<ul>
+<li>It keeps a single file in that folder holding your planner (tasks, routines and their history, categories and notes) and a short summary of your level and title, so the phone app can show it.</li>
+<li>The file goes directly between your devices and your own Google Drive. It is never sent to the developer or anyone else.</li>
+<li>On your computer, the sign-in token is encrypted by Windows and is never included in backups or exports. On your phone, the sign-in is held only while the app is open, and your planner is saved in that browser's storage for the app's page so it works offline.</li>
+<li>Settings and preferences stay on each device and are not synced.</li>
+</ul>
+
+<h2>Gmail (optional, limited)</h2>
+<p>Grovekeeper can show your starred email on its Today page, so you can turn a message into a task. This connection is currently available only to accounts the developer has added for testing. When you connect, Google asks you to allow one permission:</p>
+<ul>
+<li><strong>View your email message metadata such as labels and headers</strong> (<code>gmail.metadata</code>). This permission cannot read the text of your messages or their attachments.</li>
+</ul>
+<p>Grovekeeper uses only the sender, subject, date and labels of your starred messages, and only to show them on your computer. It saves nothing about your email except what you put in a task yourself, such as a link to the email. It cannot send, change or delete email. The sign-in token is encrypted by Windows on your computer and is never included in backups or exports.</p>
+
+<h2>How Grovekeeper uses Google data</h2>
+<p>For Calendar, Gmail and Drive alike: your Google data is used only to provide the features described above. It is <strong>not</strong> sent to the developer or anyone else, is not sold, is not used for advertising, and is not used to train AI or machine-learning models. No person reads it.</p>
 <p>Grovekeeper's use and transfer to any other app of information received from Google APIs will adhere to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
 
 <h2>Disconnecting and deleting Google data</h2>
-<p>In Grovekeeper, open <strong>This week → Month → Calendars &amp; holidays</strong> and choose <strong>Disconnect</strong>. This deletes the saved sign-in and all saved Google events from your computer. You can also remove Grovekeeper's access at any time at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>. Uninstalling Grovekeeper and deleting its data folder removes everything it stored.</p>
+<p>In Grovekeeper, open <strong>This week → Month → Calendars &amp; holidays</strong> and choose <strong>Disconnect</strong>. This deletes the saved sign-in and all saved Google events from your computer. To disconnect Gmail or phone sync, open <strong>Settings → General</strong> and choose <strong>Disconnect</strong>. For phone sync, you can also tick <strong>Also delete the copy in Drive</strong> to remove the synced file from your Drive. In the phone app, <strong>Remove from this phone</strong> deletes everything the app stored on your phone. You can also remove Grovekeeper's access at any time at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>. Uninstalling Grovekeeper and deleting its data folder removes everything it stored.</p>
 
 <h2>Other internet connections</h2>
 <p>If the optional daily content setting is on, Grovekeeper downloads a public quote, word of the day and historical events from public sources such as ZenQuotes, Merriam-Webster and Wikipedia. These requests do not include any of your personal data. Holiday calendars are built into the app.</p>
