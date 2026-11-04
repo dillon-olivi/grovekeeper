@@ -1,7 +1,7 @@
 // Grovekeeper phone app (owner approved 3 November 2026; docs/PHONE-APP.md). Today's tasks and routines, quick add,
 // the coming week, and your level as of the computer's last sync. Changes save on the phone first and sync through
 // the same private Google Drive file as the desktop. Works offline; nothing is sent anywhere except your own Drive.
-import {todayView,addTask,toggleTask,deleteTask,toggleRoutine,moveTask,commit,syncWithDrive,isoDay,addDays} from './logic.mjs';
+import {todayView,addTask,toggleTask,deleteTask,toggleRoutine,moveTask,commit,syncWithDrive,driveChanged,isoDay,addDays} from './logic.mjs';
 import {createPhoneDrive,DRIVE_SCOPE} from './drive.mjs';
 import {WEB_CLIENT_ID} from './config.mjs';
 
@@ -30,14 +30,22 @@ async function getToken(force=false){
 }
 const drive=test?.drive||createPhoneDrive({getToken});
 
-async function sync(){
+async function sync(file){
  if(syncing)return;if(!navigator.onLine&&!test){renderSync();return;}
  syncing=true;renderSync();
- try{const result=await syncWithDrive({drive,local:store.state?{state:store.state,progress:store.progress}:null,device:store.device});store.state=result.state;store.progress=result.progress;store.lastSync=new Date().toISOString();syncError='';dirty=false;persist();}
+ try{const result=await syncWithDrive({drive,local:store.state?{state:store.state,progress:store.progress}:null,device:store.device,file});if((result.progress?.totalXP??null)!==(store.progress?.totalXP??null))store.pending=[];   // the computer has counted them
+  store.state=result.state;store.progress=result.progress;store.seen=result.seen;store.lastSync=new Date().toISOString();syncError='';dirty=false;persist();}
  catch(e){syncError=e.message;}
  finally{syncing=false;render();}
 }
-let syncTimer;const syncSoon=(ms=2500)=>{clearTimeout(syncTimer);syncTimer=setTimeout(sync,ms);};
+// While the app is open: a metadata-only check every few seconds; download only when the computer changed something.
+async function check(){
+ if(syncing||!store.state||document.hidden||(!navigator.onLine&&!test))return;
+ if(document.activeElement?.matches?.('#add input')&&document.activeElement.value)return;   // never redraw under someone typing
+ if(dirty)return sync();
+ try{const file=await driveChanged(drive,store.seen);if(file)await sync(file);else{store.lastSync=new Date().toISOString();syncError='';persist();renderSync();}}catch(e){syncError=e.message;renderSync();}
+}
+let syncTimer;const syncSoon=(ms=800)=>{clearTimeout(syncTimer);syncTimer=setTimeout(sync,ms);};
 function edit(fn){const prev=store.state,next=fn(prev);if(next===prev)return;store.state=commit(prev,next,store.device);dirty=true;persist();render();syncSoon();}
 
 function ago(iso){if(!iso)return '';const m=Math.round((Date.now()-Date.parse(iso))/60000);return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':new Date(iso).toLocaleDateString(undefined,{month:'short',day:'numeric'});}
@@ -52,7 +60,9 @@ function render(){
  renderSync();const app=$('#app');
  if(!store.state){app.innerHTML=`<section class="card welcome"><h2>Your Grovekeeper, on your phone</h2><p class="muted">Sign in with the same Google account you connected on your computer (Settings → General → Phone sync). Grovekeeper opens only its own private folder in your Drive.</p><button class="primary" data-act="signin">Sign in with Google</button>${syncError?`<p class="small" style="color:#8a3b2e">${esc(syncError)}</p>`:''}</section>`;return;}
  const d=today(),v=todayView(store.state,d),p=store.progress;
- const level=p?`<section class="card level"><div class="row"><span class="title">${esc(p.title||'Wanderer')}</span><span class="lv">LEVEL ${esc(p.level)}</span></div><div class="track"><span style="width:${Math.min(100,(p.progressXP||0)/(p.levelXP||1)*100)}%"></span></div><div class="small">${esc(p.progressXP)} / ${esc(p.levelXP)} XP · as of your computer's last sync</div></section>`:'';
+ // Completions made here count when the computer next syncs (XP is calculated there; 10 XP per task, docs/LEVEL-REWARDS.md).
+ const pending=(store.pending||[]).filter(id=>store.state.tasks.some(t=>t.id===id&&t.done)).length;
+ const level=p?`<section class="card level"><div class="row"><span class="title">${esc(p.title||'Wanderer')}</span><span class="lv">LEVEL ${esc(p.level)}</span></div><div class="track"><span style="width:${Math.min(100,(p.progressXP||0)/(p.levelXP||1)*100)}%"></span></div><div class="small">${esc(p.progressXP)} / ${esc(p.levelXP)} XP · as of your computer's last sync</div>${pending?`<div class="pending">+${pending*10} XP on its way · counted when your computer syncs</div>`:''}</section>`:'';
  const taskRow=t=>`<li class="${t.done?'done':''}"><button class="check" data-act="task" data-id="${esc(t.id)}" aria-pressed="${t.done}" aria-label="${t.done?'Reopen':'Complete'} ${esc(t.title)}">${t.done?'✓':''}</button><span class="text">${esc(t.title)}</span><button class="del" data-act="delete" data-id="${esc(t.id)}" aria-label="Delete ${esc(t.title)}">×</button></li>`;
  const routineRow=r=>`<li class="${r.done?'done':''}"><button class="check" data-act="routine" data-id="${esc(r.id)}" aria-pressed="${r.done}" aria-label="${r.done?'Reopen':'Complete'} routine ${esc(r.title)}">${r.done?'✓':''}</button><span class="text">${esc(r.title)}<span class="tag">Routine</span></span></li>`;
  const upcoming=v.upcoming.map(t=>`<li><button class="check" data-act="task" data-id="${esc(t.id)}" aria-pressed="false" aria-label="Complete ${esc(t.title)}"></button><span class="text">${esc(t.title)}<br><span class="when">${esc(label(t.date))}</span></span><button class="del" data-act="today" data-id="${esc(t.id)}" aria-label="Move ${esc(t.title)} to today" title="Do it today">↑</button></li>`).join('');
@@ -73,7 +83,7 @@ document.addEventListener('click',e=>{
  switch(b.dataset.act){
   case 'signin':sync();break;
   case 'sync':sync();break;
-  case 'task':edit(s=>toggleTask(s,id,today()));break;
+  case 'task':{edit(s=>toggleTask(s,id,today()));const done=store.state.tasks.find(t=>t.id===id)?.done,list=(store.pending||[]).filter(x=>x!==id);store.pending=done?[...list,id]:list;persist();render();break;}
   case 'routine':edit(s=>toggleRoutine(s,id,today()));break;
   case 'today':edit(s=>moveTask(s,id,today()));break;
   case 'delete':{const t=store.state.tasks.find(x=>x.id===id),at=store.state.tasks.indexOf(t);edit(s=>deleteTask(s,id));toast(`Deleted “${t.title.slice(0,40)}”`,()=>edit(s=>s.tasks.some(x=>x.id===id)?s:{...s,tasks:[...s.tasks.slice(0,at),t,...s.tasks.slice(at)]}));break;}
@@ -82,6 +92,6 @@ document.addEventListener('click',e=>{
 });
 $('#sync').onclick=()=>sync();
 addEventListener('online',()=>sync());document.addEventListener('visibilitychange',()=>{if(!document.hidden&&store.state)sync();});
-setInterval(()=>{if(!document.hidden&&store.state)sync();},120000);
+setInterval(check,5000);
 if('serviceWorker' in navigator&&!test&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
 render();if(store.state)sync();

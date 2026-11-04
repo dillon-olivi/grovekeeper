@@ -17,9 +17,9 @@ export function createPhoneDrive({getToken,fetcher=(...a)=>fetch(...a)}){
  async function download(file){const u=new URL(API+'/'+encodeURIComponent(file.id));u.searchParams.set('alt','media');return call(u);}
  async function upload(content,fileId){
   const body=JSON.stringify(content);
-  if(fileId){const u=new URL(UPLOAD+'/'+encodeURIComponent(fileId));u.searchParams.set('uploadType','media');return call(u,{method:'PATCH',headers:{'Content-Type':'application/json'},body});}
+  if(fileId){const u=new URL(UPLOAD+'/'+encodeURIComponent(fileId));u.searchParams.set('uploadType','media');u.searchParams.set('fields','id,modifiedTime');return call(u,{method:'PATCH',headers:{'Content-Type':'application/json'},body});}
   const b='grovekeeper-'+Math.random().toString(36).slice(2),meta=JSON.stringify({name:SYNC_FILE,parents:['appDataFolder'],mimeType:'application/json'});
-  const u=new URL(UPLOAD);u.searchParams.set('uploadType','multipart');
+  const u=new URL(UPLOAD);u.searchParams.set('uploadType','multipart');u.searchParams.set('fields','id,modifiedTime');
   return call(u,{method:'POST',headers:{'Content-Type':`multipart/related; boundary=${b}`},body:`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${meta}\r\n--${b}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${b}--`});
  }
  return {find,download,upload};

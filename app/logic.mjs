@@ -58,11 +58,16 @@ export const commit=(prev,next,device,now)=>stampChanges(prev,next,{device,now})
 
 // One sync: download, merge, upload when the shared copy is behind. The phone never creates the shared copy from
 // nothing: the computer must sync first, so a fresh phone can never overwrite a real planner with an empty one.
-export async function syncWithDrive({drive,local,device,now=new Date().toISOString()}){
- const file=await drive.find();
- if(!file){if(!local)throw Error('No planner in Drive yet. On your computer, open Settings → General → Phone sync and connect Google Drive first.');await drive.upload(makeEnvelope(local.state,device,local.progress,now));return local;}
+// Returns {state, progress, seen}: `seen` is Drive's modifiedTime of the copy last read or written, so a later
+// metadata-only check (driveChanged) can skip the download when nothing changed. `file` may be passed in from that check.
+export async function syncWithDrive({drive,local,device,now=new Date().toISOString(),file}){
+ file=file===undefined?await drive.find():file;
+ if(!file){if(!local)throw Error('No planner in Drive yet. On your computer, open Settings → General → Phone sync and connect Google Drive first.');const r=await drive.upload(makeEnvelope(local.state,device,local.progress,now));return {...local,seen:r?.modifiedTime??null};}
  const remote=readEnvelope(await drive.download(file));
  const state=local?mergePlanners(local.state,remote.state,{now}):remote.state;
- if(JSON.stringify(state)!==JSON.stringify(remote.state))await drive.upload(makeEnvelope(state,device,remote.progress,now),file.id);
- return {state,progress:remote.progress};
+ let seen=file.modifiedTime??null;
+ if(JSON.stringify(state)!==JSON.stringify(remote.state)){const r=await drive.upload(makeEnvelope(state,device,remote.progress,now),file.id);seen=r?.modifiedTime??seen;}
+ return {state,progress:remote.progress,seen};
 }
+// Metadata only: the shared file if it changed since `seen`, otherwise null.
+export async function driveChanged(drive,seen){const file=await drive.find();return file&&file.modifiedTime!==seen?file:null;}
