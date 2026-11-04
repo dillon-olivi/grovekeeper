@@ -3,7 +3,7 @@
 // and `updatedBy` (this device's id); unchanged records keep their stamps; records that disappeared leave a tombstone
 // {kind, id, deletedAt, by} so another device can later tell "deleted here" from "never seen". A record that comes
 // back (Undo) drops its tombstone. Nothing else in the planner changes, and older files without stamps load as before.
-export const STAMP_KINDS={tasks:'task',habits:'habit',habitLogs:'habitLog',logs:'log'};
+export const STAMP_KINDS={tasks:'task',habits:'habit',habitLogs:'habitLog',logs:'log',groceries:'grocery',groceryTrips:'groceryTrip'};   // groceries: 0.12.0
 export const TOMBSTONE_DAYS=90,TOMBSTONE_MAX=5000;
 const keyOf=(kind,r)=>kind==='habitLogs'?`${r.habitId}|${r.date}`:r.id;
 const body=r=>{const {updatedAt,updatedBy,...rest}=r;return JSON.stringify(rest);};
@@ -14,6 +14,7 @@ export function stampChanges(prev,next,{now=new Date().toISOString(),device}={})
  const before=(prev&&typeof prev==='object')?prev:{};
  for(const [kind,label] of Object.entries(STAMP_KINDS)){
   const old=new Map((before[kind]||[]).map(r=>[keyOf(kind,r),r]));
+  if(next[kind]===undefined&&!(before[kind]||[]).length)continue;   // optional lists (groceries) stay absent when unused
   out[kind]=(next[kind]||[]).map(r=>{
    const k=keyOf(kind,r),o=old.get(k);seen.set(label+':'+k,true);
    if(o&&body(o)===body(r))return o.updatedAt?{...r,updatedAt:o.updatedAt,updatedBy:o.updatedBy}:stripStamps(r);

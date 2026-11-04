@@ -4,12 +4,13 @@
 import {todayView,addTask,toggleTask,deleteTask,toggleRoutine,moveTask,commit,syncWithDrive,driveChanged,isoDay,addDays} from './logic.mjs';
 import {createPhoneDrive,DRIVE_SCOPE} from './drive.mjs';
 import {WEB_CLIENT_ID} from './config.mjs';
+import {addItem,setInTrip,toggleGot,loadTrip,finishTrip,tripView,masterView,guessSection} from './groceries.mjs';
 
 const KEY='grovekeeper.phone.v1',$=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const test=globalThis.__gkTest||null;   // automated checks inject a fake Drive and date (never set in normal use)
 const today=()=>test?.today||isoDay();
-let store=load(),syncing=false,syncError='',dirty=false,addDay='today',undoTimer;
+let store=load(),syncing=false,syncError='',dirty=false,addDay='today',undoTimer,oneOff=false;
 
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s?.state)return s;}catch{}return {device:null,state:null,progress:null,lastSync:null};}
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(store));}catch{toast('This phone is out of storage space. Your last change may not be kept.');}}
@@ -41,7 +42,7 @@ async function sync(file){
 // While the app is open: a metadata-only check every few seconds; download only when the computer changed something.
 async function check(){
  if(syncing||!store.state||document.hidden||(!navigator.onLine&&!test))return;
- if(document.activeElement?.matches?.('#add input')&&document.activeElement.value)return;   // never redraw under someone typing
+ if(document.activeElement?.matches?.('#add input,#gadd input')&&document.activeElement.value)return;   // never redraw under someone typing
  if(dirty)return sync();
  try{const file=await driveChanged(drive,store.seen);if(file)await sync(file);else{store.lastSync=new Date().toISOString();syncError='';persist();renderSync();}}catch(e){syncError=e.message;renderSync();}
 }
@@ -59,6 +60,8 @@ const label=day=>day===today()?'Today':day===addDays(today(),1)?'Tomorrow':new D
 function render(){
  renderSync();const app=$('#app');
  if(!store.state){app.innerHTML=`<section class="card welcome"><h2>Your Grovekeeper, on your phone</h2><p class="muted">Sign in with the same Google account you connected on your computer (Settings → General → Phone sync). Grovekeeper opens only its own private folder in your Drive.</p><button class="primary" data-act="signin">Sign in with Google</button>${syncError?`<p class="small" style="color:#8a3b2e">${esc(syncError)}</p>`:''}</section>`;return;}
+ const tabs=`<nav class="tabs" role="tablist">${[['today','Today'],['groceries','Groceries']].map(([k,l])=>`<button type="button" role="tab" data-tab="${k}" aria-selected="${(store.tab||'today')===k}">${l}</button>`).join('')}</nav>`;
+ if(store.tab==='groceries'){app.innerHTML=tabs+groceriesView();return;}
  const d=today(),v=todayView(store.state,d),p=store.progress;
  // Completions made here count when the computer next syncs (XP is calculated there; 10 XP per task, docs/LEVEL-REWARDS.md).
  const pending=(store.pending||[]).filter(id=>store.state.tasks.some(t=>t.id===id&&t.done)).length;
@@ -66,7 +69,7 @@ function render(){
  const taskRow=t=>`<li class="${t.done?'done':''}"><button class="check" data-act="task" data-id="${esc(t.id)}" aria-pressed="${t.done}" aria-label="${t.done?'Reopen':'Complete'} ${esc(t.title)}">${t.done?'✓':''}</button><span class="text">${esc(t.title)}</span><button class="del" data-act="delete" data-id="${esc(t.id)}" aria-label="Delete ${esc(t.title)}">×</button></li>`;
  const routineRow=r=>`<li class="${r.done?'done':''}"><button class="check" data-act="routine" data-id="${esc(r.id)}" aria-pressed="${r.done}" aria-label="${r.done?'Reopen':'Complete'} routine ${esc(r.title)}">${r.done?'✓':''}</button><span class="text">${esc(r.title)}<span class="tag">Routine</span></span></li>`;
  const upcoming=v.upcoming.map(t=>`<li><button class="check" data-act="task" data-id="${esc(t.id)}" aria-pressed="false" aria-label="Complete ${esc(t.title)}"></button><span class="text">${esc(t.title)}<br><span class="when">${esc(label(t.date))}</span></span><button class="del" data-act="today" data-id="${esc(t.id)}" aria-label="Move ${esc(t.title)} to today" title="Do it today">↑</button></li>`).join('');
- app.innerHTML=`${level}
+ app.innerHTML=`${tabs}${level}
  <section class="card"><form class="add" id="add"><input name="title" maxlength="300" placeholder="Add a task" autocomplete="off" aria-label="New task"><button class="primary">Add</button></form>
   <div class="chips" role="group" aria-label="When">${['today','tomorrow'].map(k=>`<button type="button" data-day="${k}" aria-pressed="${addDay===k}">${k==='today'?'Today':'Tomorrow'}</button>`).join('')}</div></section>
  <section class="card"><h2>Today <span class="small muted">${v.done} of ${v.total} done</span></h2><ul class="list">${v.tasks.map(taskRow).join('')||'<li class="empty">Nothing planned yet. Add a task above.</li>'}</ul></section>
@@ -74,13 +77,32 @@ function render(){
  ${upcoming?`<section class="card"><h2>Coming up</h2><ul class="list">${upcoming}</ul></section>`:''}
  <footer class="foot"><button data-act="sync">Sync now</button><button data-act="forget">Remove from this phone</button></footer>`;
 }
+// Groceries (3 November 2026; docs/GROCERIES.md): the trip by aisle, tap to check off; usual items and saved trips below.
+function groceriesView(){
+ const s=store.state,v=tripView(s),usual=masterView(s),trips=s.groceryTrips||[];
+ const row=r=>`<li class="${r.got?'done':''}"><button class="check" data-act="got" data-id="${esc(r.id)}" aria-pressed="${r.got}" aria-label="${r.got?'Put back':'Got'} ${esc(r.name)}">${r.got?'✓':''}</button><span class="text">${esc(r.name)}${r.note?` <span class="tag">${esc(r.note)}</span>`:''}${r.staple?'':'<span class="tag">once</span>'}</span><button class="del" data-act="unpull" data-id="${esc(r.id)}" aria-label="Take ${esc(r.name)} off this trip">×</button></li>`;
+ return `<section class="card"><form class="add" id="gadd"><input name="title" maxlength="120" placeholder="Add an item" autocomplete="off" aria-label="Grocery item"><button class="primary">Add</button></form>
+  <div class="chips"><button type="button" data-act="oneoff" aria-pressed="${oneOff}">Just this once</button></div></section>
+ <section class="card"><h2>This trip <span class="small muted">${v.total?`${v.got} of ${v.total} in the cart`:''}</span></h2>
+  ${v.total?v.sections.map(sec=>`<h3 class="aisle">${esc(sec.label)}</h3><ul class="list">${sec.items.map(row).join('')}</ul>`).join(''):'<p class="empty">Nothing on this trip yet. Add an item, or tap your usual items below.</p>'}
+  ${v.got?`<button class="primary wide" data-act="finish">Finish trip (${v.got} bought)</button>`:''}</section>
+ ${trips.length?`<section class="card"><h2>Saved trips</h2><div class="chips wrap">${trips.map(t=>`<button type="button" data-act="loadtrip" data-id="${esc(t.id)}" ${t.items.length?'':'disabled'}>+ ${esc(t.name)}</button>`).join('')}</div></section>`:''}
+ ${usual.length?`<section class="card"><h2>Usual items</h2><ul class="list">${usual.map(r=>`<li class="${r.inTrip?'on':''}"><span class="text">${esc(r.name)}</span><button class="pill${r.inTrip?' on':''}" data-act="${r.inTrip?'unpull':'pull'}" data-id="${esc(r.id)}" aria-pressed="${r.inTrip}">${r.inTrip?'✓ On trip':'+ Add'}</button></li>`).join('')}</ul></section>`:''}`;
+}
 function toast(text,undo){const t=$('#toast');clearTimeout(undoTimer);t.innerHTML=`<span>${esc(text)}</span>${undo?'<button type="button">Undo</button>':''}`;t.hidden=false;if(undo)t.querySelector('button').onclick=()=>{t.hidden=true;undo();};undoTimer=setTimeout(()=>{t.hidden=true;},6000);}
 
-document.addEventListener('submit',e=>{if(e.target.id!=='add')return;e.preventDefault();const input=e.target.elements.title,day=addDay==='today'?today():addDays(today(),1);edit(s=>addTask(s,input.value,day));input.value='';input.focus();});
+document.addEventListener('submit',e=>{if(e.target.id==='gadd'){e.preventDefault();const input=e.target.elements.title,name=input.value.trim();if(!name)return;edit(s=>addItem(s,{name,section:guessSection(name),staple:!oneOff,inTrip:true}));oneOff=false;input.value='';render();$('#gadd input')?.focus();return;}if(e.target.id!=='add')return;e.preventDefault();const input=e.target.elements.title,day=addDay==='today'?today():addDays(today(),1);edit(s=>addTask(s,input.value,day));input.value='';input.focus();});
 document.addEventListener('click',e=>{
+ const tab=e.target.closest('[data-tab]');if(tab){store.tab=tab.dataset.tab;persist();render();scrollTo(0,0);return;}
  const day=e.target.closest('[data-day]');if(day){addDay=day.dataset.day;render();$('#add input')?.focus();return;}
  const b=e.target.closest('[data-act]');if(!b)return;const id=b.dataset.id;
  switch(b.dataset.act){
+  case 'got':edit(s=>toggleGot(s,id));break;
+  case 'pull':edit(s=>setInTrip(s,id,true));break;
+  case 'unpull':edit(s=>setInTrip(s,id,false));break;
+  case 'loadtrip':edit(s=>loadTrip(s,id));break;
+  case 'oneoff':oneOff=!oneOff;render();$('#gadd input')?.focus();break;
+  case 'finish':{const before=store.state;edit(s=>finishTrip(s));toast('Trip finished. Bought items are back on your usual list.',()=>edit(s=>({...s,groceries:before.groceries,groceryTrips:before.groceryTrips})));break;}
   case 'signin':sync();break;
   case 'sync':sync();break;
   case 'task':{edit(s=>toggleTask(s,id,today()));const done=store.state.tasks.find(t=>t.id===id)?.done,list=(store.pending||[]).filter(x=>x!==id);store.pending=done?[...list,id]:list;persist();render();break;}

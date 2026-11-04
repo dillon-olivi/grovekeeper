@@ -27,3 +27,8 @@ ul.list{list-style:none;margin:0;padding:0}ul.list li{display:flex;align-items:c
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 16px);background:#22352b;color:#f4efe0;padding:10px 12px 10px 16px;border-radius:12px;display:flex;gap:12px;align-items:center;box-shadow:0 8px 24px #0006;max-width:calc(100vw - 32px);font-size:14px}
 .toast[hidden]{display:none}.toast button{min-height:32px;padding:4px 12px}
 footer.foot{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:8px 0}footer.foot button{background:transparent;color:#cfd4c3;border-color:#ffffff30;font-size:13px;min-height:34px}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#0000002e;border-radius:12px;padding:4px}
+.tabs button{min-height:38px;border:0;background:transparent;color:#d8dccd;font-weight:600}.tabs button[aria-selected=true]{background:var(--panel);color:var(--ink)}
+h3.aisle{font:600 11.5px/1 'Segoe UI',system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 0 2px}
+.chips.wrap{flex-wrap:wrap}button.wide{width:100%;margin-top:10px}
+.pill{flex:none;min-height:32px;padding:4px 12px;font-size:13px;border-radius:999px}.pill.on{background:var(--accent);color:#fff;border-color:#354e2d}

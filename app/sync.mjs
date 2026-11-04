@@ -48,7 +48,7 @@ export function mergeRecords(kind,local=[],remote=[],tombs){
 export function mergePlanners(local,remote,{now=new Date().toISOString()}={}){
  if(!remote)return local;
  const tombs=tombIndex(local.tombstones,remote.tombstones),out={...local};
- for(const kind of Object.keys(STAMP_KINDS))out[kind]=mergeRecords(kind,local[kind],remote[kind],tombs);
+ for(const kind of Object.keys(STAMP_KINDS)){out[kind]=mergeRecords(kind,local[kind],remote[kind],tombs);if(!out[kind].length&&local[kind]===undefined&&remote[kind]===undefined)delete out[kind];}   // optional lists stay absent
  // Keep any routine that routine days still refer to (restored as retired), so history and validation stay intact.
  const habitIds=new Set(out.habits.map(h=>h.id)),allHabits=new Map([...(remote.habits||[]),...(local.habits||[])].map(h=>[h.id,h]));
  for(const r of out.habitLogs)if(!habitIds.has(r.habitId)&&allHabits.has(r.habitId)){out.habits.push({...allHabits.get(r.habitId),retired:true,paused:true});habitIds.add(r.habitId);}
@@ -61,7 +61,7 @@ export function mergePlanners(local,remote,{now=new Date().toISOString()}={}){
  out.settings={...local.settings,...(peak?{identity:{...(local.settings?.identity||{}),peakLevel:peak}}:{})};
  out.rest=[...new Set([...(local.rest||[]),...(remote.rest||[])])].sort();
  // Tombstones: latest per record, minus records that exist again, pruned like local ones.
- const present=new Set(Object.keys(STAMP_KINDS).flatMap(kind=>out[kind].map(r=>label(kind)+':'+keyOf(kind,r))));
+ const present=new Set(Object.keys(STAMP_KINDS).flatMap(kind=>(out[kind]||[]).map(r=>label(kind)+':'+keyOf(kind,r))));
  const kept=pruneTombstones([...tombs.values()].filter(t=>!present.has(t.kind+':'+t.id)),now);
  if(kept.length)out.tombstones=kept;else delete out.tombstones;
  return out;
