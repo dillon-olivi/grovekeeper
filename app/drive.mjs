@@ -1,4 +1,4 @@
-// Grovekeeper phone app: the Drive app-folder file shared with the computer (same file and format as
+// JournalScape phone app: the Drive app-folder file shared with the computer (same file and format as
 // google-drive.mjs on the desktop). Uses a short-lived access token from Google's browser sign-in; no secrets.
 export const SYNC_FILE='grovekeeper-sync.json',DRIVE_SCOPE='https://www.googleapis.com/auth/drive.appdata';
 const API='https://www.googleapis.com/drive/v3/files',UPLOAD='https://www.googleapis.com/upload/drive/v3/files';

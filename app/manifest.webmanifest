@@ -1,7 +1,7 @@
 {
-  "name": "Grovekeeper",
-  "short_name": "Grovekeeper",
-  "description": "Your Grovekeeper planner on your phone: today's tasks, routines and level.",
+  "name": "JournalScape",
+  "short_name": "JournalScape",
+  "description": "Your JournalScape planner on your phone: today's tasks, routines and level.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

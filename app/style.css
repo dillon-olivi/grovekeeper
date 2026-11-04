@@ -32,3 +32,8 @@ footer.foot{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;padding:8
 h3.aisle{font:600 11.5px/1 'Segoe UI',system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 0 2px}
 .chips.wrap{flex-wrap:wrap}button.wide{width:100%;margin-top:10px}
 .pill{flex:none;min-height:32px;padding:4px 12px;font-size:13px;border-radius:999px}.pill.on{background:var(--accent);color:#fff;border-color:#354e2d}
+.tabs{grid-template-columns:1fr 1fr 1fr}
+.journal .jhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}.journal .jhead h2{flex:1;text-align:center;margin:0}.journal .jhead button{min-width:40px;font-size:20px;padding:2px 10px}
+#jtext{display:block;width:100%;min-height:46vh;resize:vertical;padding:14px;border-radius:10px;border:1px solid #c9b996;background:#fffdf6;color:var(--ink);font:16px/1.65 Georgia,serif}
+button.jitem{display:grid;gap:2px;width:100%;text-align:left;border:0;background:transparent;padding:4px 0;min-height:0;color:var(--ink)}
+button.jitem .when{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

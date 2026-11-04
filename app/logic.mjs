@@ -1,4 +1,4 @@
-// Grovekeeper phone app: planner logic (owner approved 3 November 2026; docs/PHONE-APP.md). Pure functions shared by
+// JournalScape phone app: planner logic (owner approved 3 November 2026; docs/PHONE-APP.md). Pure functions shared by
 // the phone screens and the tests. Edits produce records in exactly the shape the desktop validates (core.mjs), are
 // stamped like desktop saves (sync-stamps.mjs) and merge with the same rules (sync.mjs).
 import {stampChanges} from './sync-stamps.mjs';
@@ -12,10 +12,10 @@ export const monday=day=>{const d=new Date(day+'T12:00:00');return addDays(day,-
 const ALL_DAYS=[0,1,2,3,4,5,6];
 const uuid=()=>globalThis.crypto?.randomUUID?.()||'m-'+Date.now().toString(36)+Math.random().toString(36).slice(2,10);
 
-// The shared copy must be a Grovekeeper planner of a format this app understands; anything else is left untouched.
+// The shared copy must be a JournalScape planner of a format this app understands; anything else is left untouched.
 export function readEnvelope(content){
- if(!content||typeof content!=='object'||content.format!==SYNC_FORMAT)throw Error('The copy in Drive is not a Grovekeeper planner.');
- if(content.version!==SYNC_VERSION)throw Error('Your computer has a newer Grovekeeper. Update this app (reload it) to keep syncing.');
+ if(!content||typeof content!=='object'||content.format!==SYNC_FORMAT)throw Error('The copy in Drive is not a JournalScape planner.');
+ if(content.version!==SYNC_VERSION)throw Error('Your computer has a newer JournalScape. Update this app (reload it) to keep syncing.');
  const s=content.state;
  if(!s||!PLANNER_VERSIONS.includes(s.version)||!['tasks','habits','habitLogs','logs','rest'].every(k=>Array.isArray(s[k]))||!Array.isArray(s.categories))throw Error('The copy in Drive could not be read. Nothing was changed.');
  return {state:s,progress:content.progress||null};

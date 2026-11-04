@@ -1,10 +1,11 @@
-// Grovekeeper phone app (owner approved 3 November 2026; docs/PHONE-APP.md). Today's tasks and routines, quick add,
+// JournalScape phone app (owner approved 3 November 2026; docs/PHONE-APP.md). Today's tasks and routines, quick add,
 // the coming week, and your level as of the computer's last sync. Changes save on the phone first and sync through
 // the same private Google Drive file as the desktop. Works offline; nothing is sent anywhere except your own Drive.
 import {todayView,addTask,toggleTask,deleteTask,toggleRoutine,moveTask,commit,syncWithDrive,driveChanged,isoDay,addDays} from './logic.mjs';
 import {createPhoneDrive,DRIVE_SCOPE} from './drive.mjs';
 import {WEB_CLIENT_ID} from './config.mjs';
 import {addItem,setInTrip,toggleGot,loadTrip,finishTrip,tripView,masterView,guessSection} from './groceries.mjs';
+import {entryFor,writeEntry,journalList,wordCount} from './journal.mjs';
 
 const KEY='grovekeeper.phone.v1',$=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -42,7 +43,8 @@ async function sync(file){
 // While the app is open: a metadata-only check every few seconds; download only when the computer changed something.
 async function check(){
  if(syncing||!store.state||document.hidden||(!navigator.onLine&&!test))return;
- if(document.activeElement?.matches?.('#add input,#gadd input')&&document.activeElement.value)return;   // never redraw under someone typing
+ if(document.activeElement?.matches?.('#add input,#gadd input')&&document.activeElement.value)return;
+ if(document.activeElement?.id==='jtext'||journalTimer)return;   // never reload the journal under someone writing   // never redraw under someone typing
  if(dirty)return sync();
  try{const file=await driveChanged(drive,store.seen);if(file)await sync(file);else{store.lastSync=new Date().toISOString();syncError='';persist();renderSync();}}catch(e){syncError=e.message;renderSync();}
 }
@@ -59,9 +61,10 @@ const label=day=>day===today()?'Today':day===addDays(today(),1)?'Tomorrow':new D
 
 function render(){
  renderSync();const app=$('#app');
- if(!store.state){app.innerHTML=`<section class="card welcome"><h2>Your Grovekeeper, on your phone</h2><p class="muted">Sign in with the same Google account you connected on your computer (Settings → General → Phone sync). Grovekeeper opens only its own private folder in your Drive.</p><button class="primary" data-act="signin">Sign in with Google</button>${syncError?`<p class="small" style="color:#8a3b2e">${esc(syncError)}</p>`:''}</section>`;return;}
- const tabs=`<nav class="tabs" role="tablist">${[['today','Today'],['groceries','Groceries']].map(([k,l])=>`<button type="button" role="tab" data-tab="${k}" aria-selected="${(store.tab||'today')===k}">${l}</button>`).join('')}</nav>`;
+ if(!store.state){app.innerHTML=`<section class="card welcome"><h2>Your JournalScape, on your phone</h2><p class="muted">Sign in with the same Google account you connected on your computer (Settings → General → Phone sync). JournalScape opens only its own private folder in your Drive.</p><button class="primary" data-act="signin">Sign in with Google</button>${syncError?`<p class="small" style="color:#8a3b2e">${esc(syncError)}</p>`:''}</section>`;return;}
+ const tabs=`<nav class="tabs" role="tablist">${[['today','Today'],['journal','Journal'],['groceries','Groceries']].map(([k,l])=>`<button type="button" role="tab" data-tab="${k}" aria-selected="${(store.tab||'today')===k}">${l}</button>`).join('')}</nav>`;
  if(store.tab==='groceries'){app.innerHTML=tabs+groceriesView();return;}
+ if(store.tab==='journal'){app.innerHTML=tabs+journalView();return;}
  const d=today(),v=todayView(store.state,d),p=store.progress;
  // Completions made here count when the computer next syncs (XP is calculated there; 10 XP per task, docs/LEVEL-REWARDS.md).
  const pending=(store.pending||[]).filter(id=>store.state.tasks.some(t=>t.id===id&&t.done)).length;
@@ -78,6 +81,20 @@ function render(){
  <footer class="foot"><button data-act="sync">Sync now</button><button data-act="forget">Remove from this phone</button></footer>`;
 }
 // Groceries (3 November 2026; docs/GROCERIES.md): the trip by aisle, tap to check off; usual items and saved trips below.
+// Journal (3 November 2026; docs/JOURNAL.md): today's entry (or any earlier day), saved as you write; earlier entries below.
+let journalDay=null,journalTimer=null;
+const shiftDay=(day,n)=>{const d=new Date(day+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+function journalView(){
+ const d=journalDay||today(),e=entryFor(store.state,d),list=journalList(store.state).slice(0,30);
+ return `<section class="card journal"><div class="jhead"><button type="button" data-act="jprev" aria-label="Previous day">‹</button><h2>${esc(label(d))}</h2><button type="button" data-act="jnext" aria-label="Next day">›</button></div>
+  <textarea id="jtext" maxlength="20000" placeholder="How was your day?" aria-label="Journal entry for ${esc(label(d))}">${esc(e?e.text:'')}</textarea>
+  <div class="small muted" id="jcount">${e?wordCount(e.text)+' words':''}</div></section>
+ ${list.length?`<section class="card"><h2>Past entries</h2><ul class="list">${list.map(r=>`<li><button type="button" class="jitem" data-act="jopen" data-id="${esc(r.id)}"><strong>${esc(label(r.id))}</strong><span class="when">${esc(r.preview)}</span></button></li>`).join('')}</ul></section>`:''}`;
+}
+// Saving a journal entry never redraws the page (so the keyboard and cursor stay put while writing).
+function saveJournal(){clearTimeout(journalTimer);journalTimer=null;const t=$('#jtext');if(!t)return;const d=journalDay||today(),prev=store.state,next=writeEntry(prev,d,t.value);if(next===prev)return;store.state=commit(prev,next,store.device);dirty=true;persist();renderSync();syncSoon();}
+document.addEventListener('input',e=>{if(e.target.id!=='jtext')return;const n=wordCount(e.target.value);$('#jcount').textContent=n?n+' words':'';clearTimeout(journalTimer);journalTimer=setTimeout(saveJournal,800);});
+document.addEventListener('focusout',e=>{if(e.target.id==='jtext')saveJournal();});
 function groceriesView(){
  const s=store.state,v=tripView(s),usual=masterView(s),trips=s.groceryTrips||[];
  const row=r=>`<li class="${r.got?'done':''}"><button class="check" data-act="got" data-id="${esc(r.id)}" aria-pressed="${r.got}" aria-label="${r.got?'Put back':'Got'} ${esc(r.name)}">${r.got?'✓':''}</button><span class="text">${esc(r.name)}${r.note?` <span class="tag">${esc(r.note)}</span>`:''}${r.staple?'':'<span class="tag">once</span>'}</span><button class="del" data-act="unpull" data-id="${esc(r.id)}" aria-label="Take ${esc(r.name)} off this trip">×</button></li>`;
@@ -93,10 +110,13 @@ function toast(text,undo){const t=$('#toast');clearTimeout(undoTimer);t.innerHTM
 
 document.addEventListener('submit',e=>{if(e.target.id==='gadd'){e.preventDefault();const input=e.target.elements.title,name=input.value.trim();if(!name)return;edit(s=>addItem(s,{name,section:guessSection(name),staple:!oneOff,inTrip:true}));oneOff=false;input.value='';render();$('#gadd input')?.focus();return;}if(e.target.id!=='add')return;e.preventDefault();const input=e.target.elements.title,day=addDay==='today'?today():addDays(today(),1);edit(s=>addTask(s,input.value,day));input.value='';input.focus();});
 document.addEventListener('click',e=>{
- const tab=e.target.closest('[data-tab]');if(tab){store.tab=tab.dataset.tab;persist();render();scrollTo(0,0);return;}
+ const tab=e.target.closest('[data-tab]');if(tab){saveJournal();store.tab=tab.dataset.tab;persist();render();scrollTo(0,0);return;}
  const day=e.target.closest('[data-day]');if(day){addDay=day.dataset.day;render();$('#add input')?.focus();return;}
  const b=e.target.closest('[data-act]');if(!b)return;const id=b.dataset.id;
  switch(b.dataset.act){
+  case 'jprev':saveJournal();journalDay=shiftDay(journalDay||today(),-1);render();break;
+  case 'jnext':saveJournal();journalDay=shiftDay(journalDay||today(),1);render();break;
+  case 'jopen':saveJournal();journalDay=id;render();scrollTo(0,0);break;
   case 'got':edit(s=>toggleGot(s,id));break;
   case 'pull':edit(s=>setInTrip(s,id,true));break;
   case 'unpull':edit(s=>setInTrip(s,id,false));break;
@@ -109,7 +129,7 @@ document.addEventListener('click',e=>{
   case 'routine':edit(s=>toggleRoutine(s,id,today()));break;
   case 'today':edit(s=>moveTask(s,id,today()));break;
   case 'delete':{const t=store.state.tasks.find(x=>x.id===id),at=store.state.tasks.indexOf(t);edit(s=>deleteTask(s,id));toast(`Deleted “${t.title.slice(0,40)}”`,()=>edit(s=>s.tasks.some(x=>x.id===id)?s:{...s,tasks:[...s.tasks.slice(0,at),t,...s.tasks.slice(at)]}));break;}
-  case 'forget':if(confirm('Remove Grovekeeper data from this phone? Your planner stays on your computer and in Drive.')){localStorage.removeItem(KEY);store=load();store.device=null;token=null;location.reload();}break;
+  case 'forget':if(confirm('Remove JournalScape data from this phone? Your planner stays on your computer and in Drive.')){localStorage.removeItem(KEY);store=load();store.device=null;token=null;location.reload();}break;
  }
 });
 $('#sync').onclick=()=>sync();
